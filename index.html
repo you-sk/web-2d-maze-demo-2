@@ -1,0 +1,481 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>2D迷路自動生成・解決アプリ</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            margin: 0;
+            padding: 20px;
+            min-height: 100vh;
+        }
+
+        .container {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        h1 {
+            text-align: center;
+            margin-bottom: 30px;
+            font-size: 2.5em;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+        }
+
+        #canvas {
+            border: 3px solid rgba(255, 255, 255, 0.3);
+            border-radius: 10px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+            background: white;
+        }
+
+        .controls {
+            margin: 20px 0;
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        button {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 25px;
+            background: linear-gradient(45deg, #ff6b6b, #ee5a24);
+            color: white;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: bold;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+        }
+
+        button:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+        }
+
+        button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .status {
+            text-align: center;
+            margin: 15px 0;
+            font-size: 18px;
+            font-weight: bold;
+            text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.3);
+        }
+
+        .settings {
+            display: flex;
+            gap: 20px;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+
+        .setting-group {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            background: rgba(255, 255, 255, 0.1);
+            padding: 10px 15px;
+            border-radius: 15px;
+        }
+
+        label {
+            font-weight: bold;
+        }
+
+        select, input[type="range"] {
+            padding: 5px 10px;
+            border: none;
+            border-radius: 5px;
+            background: rgba(255, 255, 255, 0.9);
+            color: #333;
+        }
+
+        .legend {
+            display: flex;
+            gap: 20px;
+            justify-content: center;
+            margin: 15px 0;
+            flex-wrap: wrap;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 14px;
+        }
+
+        .legend-color {
+            width: 20px;
+            height: 20px;
+            border-radius: 3px;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🌟 2D迷路自動生成・解決システム 🌟</h1>
+        
+        <div class="settings">
+            <div class="setting-group">
+                <label for="mazeSize">迷路サイズ:</label>
+                <select id="mazeSize">
+                    <option value="21">小 (21x21)</option>
+                    <option value="31" selected>中 (31x31)</option>
+                    <option value="41">大 (41x41)</option>
+                </select>
+            </div>
+            <div class="setting-group">
+                <label for="speed">速度:</label>
+                <input type="range" id="speed" min="1" max="10" value="5">
+                <span id="speedValue">5</span>
+            </div>
+        </div>
+
+        <canvas id="canvas" width="600" height="600"></canvas>
+
+        <div class="legend">
+            <div class="legend-item">
+                <div class="legend-color" style="background: #2c3e50;"></div>
+                <span>壁</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background: white;"></div>
+                <span>通路</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background: #27ae60;"></div>
+                <span>スタート</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background: #e74c3c;"></div>
+                <span>ゴール</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background: #3498db;"></div>
+                <span>探索中</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background: #f39c12;"></div>
+                <span>最短経路</span>
+            </div>
+        </div>
+
+        <div class="status" id="status">迷路を生成する準備ができました</div>
+
+        <div class="controls">
+            <button id="generateBtn">🎲 迷路生成</button>
+            <button id="solveBtn" disabled>🔍 迷路解決</button>
+            <button id="resetBtn">🔄 リセット</button>
+            <button id="autoBtn">⚡ 自動実行</button>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        const status = document.getElementById('status');
+        const generateBtn = document.getElementById('generateBtn');
+        const solveBtn = document.getElementById('solveBtn');
+        const resetBtn = document.getElementById('resetBtn');
+        const autoBtn = document.getElementById('autoBtn');
+        const speedSlider = document.getElementById('speed');
+        const speedValue = document.getElementById('speedValue');
+        const sizeSelect = document.getElementById('mazeSize');
+
+        let maze = [];
+        let size = 31;
+        let cellSize = 0;
+        let isGenerating = false;
+        let isSolving = false;
+        let animationSpeed = 50;
+
+        // 速度スライダーの更新
+        speedSlider.addEventListener('input', (e) => {
+            const speed = parseInt(e.target.value);
+            speedValue.textContent = speed;
+            animationSpeed = 110 - (speed * 10); // 1-10 → 100-10ms
+        });
+
+        // サイズ選択の更新
+        sizeSelect.addEventListener('change', (e) => {
+            size = parseInt(e.target.value);
+            reset();
+        });
+
+        class MazeGenerator {
+            constructor(size) {
+                this.size = size;
+                this.maze = Array(size).fill().map(() => Array(size).fill(1));
+                this.stack = [];
+                this.visited = Array(size).fill().map(() => Array(size).fill(false));
+            }
+
+            async generate() {
+                isGenerating = true;
+                updateButtons();
+                status.textContent = '迷路を生成中...';
+
+                // スタート地点
+                const startX = 1;
+                const startY = 1;
+                this.maze[startY][startX] = 0;
+                this.visited[startY][startX] = true;
+                this.stack.push([startX, startY]);
+
+                while (this.stack.length > 0 && isGenerating) {
+                    const [x, y] = this.stack[this.stack.length - 1];
+                    const neighbors = this.getUnvisitedNeighbors(x, y);
+
+                    if (neighbors.length > 0) {
+                        const [nx, ny] = neighbors[Math.floor(Math.random() * neighbors.length)];
+                        
+                        // 壁を削除
+                        this.maze[ny][nx] = 0;
+                        this.maze[y + (ny - y) / 2][x + (nx - x) / 2] = 0;
+                        
+                        this.visited[ny][nx] = true;
+                        this.stack.push([nx, ny]);
+                    } else {
+                        this.stack.pop();
+                    }
+
+                    maze = this.maze.map(row => [...row]);
+                    drawMaze();
+                    await new Promise(resolve => setTimeout(resolve, animationSpeed));
+                }
+
+                if (isGenerating) {
+                    status.textContent = '迷路生成完了！解決ボタンを押してください';
+                    solveBtn.disabled = false;
+                }
+                isGenerating = false;
+                updateButtons();
+            }
+
+            getUnvisitedNeighbors(x, y) {
+                const neighbors = [];
+                const directions = [[0, -2], [2, 0], [0, 2], [-2, 0]];
+
+                for (const [dx, dy] of directions) {
+                    const nx = x + dx;
+                    const ny = y + dy;
+                    
+                    if (nx >= 1 && nx < this.size - 1 && 
+                        ny >= 1 && ny < this.size - 1 && 
+                        !this.visited[ny][nx]) {
+                        neighbors.push([nx, ny]);
+                    }
+                }
+
+                return neighbors;
+            }
+        }
+
+        class MazeSolver {
+            constructor(maze) {
+                this.maze = maze.map(row => [...row]);
+                this.size = maze.length;
+                this.start = [1, 1];
+                this.end = [this.size - 2, this.size - 2];
+                this.visited = Array(this.size).fill().map(() => Array(this.size).fill(false));
+                this.parent = {};
+                this.queue = [];
+                this.path = [];
+                this.exploring = [];
+            }
+
+            async solve() {
+                isSolving = true;
+                updateButtons();
+                status.textContent = '迷路を解決中...';
+
+                // BFS（幅優先探索）で解決
+                this.queue.push(this.start);
+                this.visited[this.start[1]][this.start[0]] = true;
+
+                while (this.queue.length > 0 && isSolving) {
+                    const [x, y] = this.queue.shift();
+                    this.exploring.push([x, y]);
+
+                    if (x === this.end[0] && y === this.end[1]) {
+                        this.reconstructPath();
+                        break;
+                    }
+
+                    const neighbors = this.getNeighbors(x, y);
+                    for (const [nx, ny] of neighbors) {
+                        if (!this.visited[ny][nx] && this.maze[ny][nx] === 0) {
+                            this.visited[ny][nx] = true;
+                            this.parent[`${nx},${ny}`] = [x, y];
+                            this.queue.push([nx, ny]);
+                        }
+                    }
+
+                    drawMaze();
+                    this.drawExploring();
+                    await new Promise(resolve => setTimeout(resolve, animationSpeed));
+                }
+
+                if (isSolving) {
+                    await this.animatePath();
+                    status.textContent = '迷路解決完了！🎉';
+                }
+                isSolving = false;
+                updateButtons();
+            }
+
+            getNeighbors(x, y) {
+                const neighbors = [];
+                const directions = [[0, -1], [1, 0], [0, 1], [-1, 0]];
+
+                for (const [dx, dy] of directions) {
+                    const nx = x + dx;
+                    const ny = y + dy;
+                    
+                    if (nx >= 0 && nx < this.size && ny >= 0 && ny < this.size) {
+                        neighbors.push([nx, ny]);
+                    }
+                }
+
+                return neighbors;
+            }
+
+            reconstructPath() {
+                let current = this.end;
+                this.path = [current];
+
+                while (current[0] !== this.start[0] || current[1] !== this.start[1]) {
+                    current = this.parent[`${current[0]},${current[1]}`];
+                    this.path.unshift(current);
+                }
+            }
+
+            async animatePath() {
+                for (let i = 0; i < this.path.length; i++) {
+                    drawMaze();
+                    this.drawPath(i + 1);
+                    await new Promise(resolve => setTimeout(resolve, animationSpeed * 2));
+                }
+            }
+
+            drawExploring() {
+                for (const [x, y] of this.exploring) {
+                    if ((x !== this.start[0] || y !== this.start[1]) && 
+                        (x !== this.end[0] || y !== this.end[1])) {
+                        ctx.fillStyle = '#3498db';
+                        ctx.fillRect(x * cellSize + 1, y * cellSize + 1, cellSize - 2, cellSize - 2);
+                    }
+                }
+            }
+
+            drawPath(length) {
+                for (let i = 0; i < Math.min(length, this.path.length); i++) {
+                    const [x, y] = this.path[i];
+                    if ((x !== this.start[0] || y !== this.start[1]) && 
+                        (x !== this.end[0] || y !== this.end[1])) {
+                        ctx.fillStyle = '#f39c12';
+                        ctx.fillRect(x * cellSize + 1, y * cellSize + 1, cellSize - 2, cellSize - 2);
+                    }
+                }
+            }
+        }
+
+        function drawMaze() {
+            cellSize = canvas.width / size;
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            for (let y = 0; y < size; y++) {
+                for (let x = 0; x < size; x++) {
+                    if (maze[y] && maze[y][x] === 1) {
+                        ctx.fillStyle = '#2c3e50';
+                    } else {
+                        ctx.fillStyle = 'white';
+                    }
+                    ctx.fillRect(x * cellSize, y * cellSize, cellSize, cellSize);
+                }
+            }
+
+            // スタートとゴールを描画
+            if (maze.length > 0) {
+                // スタート（緑）
+                ctx.fillStyle = '#27ae60';
+                ctx.fillRect(cellSize + 1, cellSize + 1, cellSize - 2, cellSize - 2);
+
+                // ゴール（赤）
+                ctx.fillStyle = '#e74c3c';
+                ctx.fillRect((size - 2) * cellSize + 1, (size - 2) * cellSize + 1, cellSize - 2, cellSize - 2);
+            }
+        }
+
+        function reset() {
+            isGenerating = false;
+            isSolving = false;
+            maze = Array(size).fill().map(() => Array(size).fill(1));
+            status.textContent = '迷路を生成する準備ができました';
+            updateButtons();
+            drawMaze();
+        }
+
+        function updateButtons() {
+            generateBtn.disabled = isGenerating || isSolving;
+            solveBtn.disabled = isGenerating || isSolving || maze.length === 0 || maze[1][1] === 1;
+            resetBtn.disabled = isGenerating || isSolving;
+            autoBtn.disabled = isGenerating || isSolving;
+        }
+
+        async function autoRun() {
+            reset();
+            await new Promise(resolve => setTimeout(resolve, 500));
+            
+            const generator = new MazeGenerator(size);
+            await generator.generate();
+            
+            if (!isGenerating && !isSolving) {
+                await new Promise(resolve => setTimeout(resolve, 1000));
+                const solver = new MazeSolver(maze);
+                await solver.solve();
+            }
+        }
+
+        // イベントリスナー
+        generateBtn.addEventListener('click', async () => {
+            reset();
+            const generator = new MazeGenerator(size);
+            await generator.generate();
+        });
+
+        solveBtn.addEventListener('click', async () => {
+            const solver = new MazeSolver(maze);
+            await solver.solve();
+        });
+
+        resetBtn.addEventListener('click', reset);
+        autoBtn.addEventListener('click', autoRun);
+
+        // 初期化
+        reset();
+    </script>
+</body>
+</html>
